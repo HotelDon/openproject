@@ -104,12 +104,7 @@ class IssuesController < ApplicationController
   def show
     @journals = @issue.journals.changing.find(:all, :include => [:user], :order => "#{Journal.table_name}.created_at ASC")
     @journals.reverse! if User.current.wants_comments_in_reverse_order?
-    @changesets = @issue.changesets.all(:include => [{ :repository => {:project => :enabled_modules} }, :user])
-
-    @changesets = @changesets.group_by(&:repository).inject([]) do |arr, (repository, changesets)|
-      arr += changesets if User.current.allowed_to?(:view_changesets, repository.project)
-    end
-
+    @changesets = @issue.changesets.visible.all(:include => [{ :repository => {:project => :enabled_modules} }, :user])
     @changesets.reverse! if User.current.wants_comments_in_reverse_order?
 
     @relations = @issue.relations(:include => { :other_issue => [:status,
@@ -119,26 +114,18 @@ class IssuesController < ApplicationController
                                               }
                                  ).select{ |r| r.other_issue(@issue) && r.other_issue(@issue).visible? }
 
-    @ancestors = @issue.ancestors.all(:include => [:tracker,
+    @ancestors = @issue.ancestors.visible.all(:include => [:tracker,
                                                            :assigned_to,
                                                            :status,
                                                            :priority,
                                                            :fixed_version,
                                                            :project])
-    @ancestors = @ancestors.group_by(&:project).inject([]) do |arr, (project, ancestors)|
-      arr += ancestors if User.current.allowed_to?(:view_issues, project)
-    end
-
-    @descendants = @issue.descendants.all(:include => [:tracker,
+    @descendants = @issue.descendants.visible.all(:include => [:tracker,
                                                                :assigned_to,
                                                                :status,
                                                                :priority,
                                                                :fixed_version,
                                                                :project])
-    @descendants = @descendants.group_by(&:project).inject([]) do |arr, (project, descendants)|
-      arr += descendants if User.current.allowed_to?(:view_issues, project)
-    end
-
 
     @edit_allowed = User.current.allowed_to?(:edit_issues, @project)
     @time_entry = TimeEntry.new(:issue => @issue, :project => @issue.project)
